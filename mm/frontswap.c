@@ -216,38 +216,31 @@ void __frontswap_invalidate_area(unsigned type)
 }
 EXPORT_SYMBOL(__frontswap_invalidate_area);
 
-/*
- * Frontswap, like a true swap device, may unnecessarily retain pages
- * under certain circumstances; "shrink" frontswap is essentially a
- * "partial swapoff" and works by calling try_to_unuse to attempt to
- * unuse enough frontswap pages to attempt to -- subject to memory
- * constraints -- reduce the number of pages in frontswap to the
- * number given in the parameter target_pages.
- */
-void frontswap_shrink(unsigned long target_pages)
+static unsigned long __frontswap_curr_pages(void)
 {
-	struct swap_info_struct *si = NULL;
-	int si_frontswap_pages;
-	unsigned long total_pages = 0, total_pages_to_unuse;
-	unsigned long pages = 0, pages_to_unuse = 0;
 	int type;
-	bool locked = false;
+	unsigned long totalpages = 0;
+	struct swap_info_struct *si = NULL;
 
-	/*
-	 * we don't want to hold swap_lock while doing a very
-	 * lengthy try_to_unuse, but swap_list may change
-	 * so restart scan from swap_list.head each time
-	 */
-	spin_lock(&swap_lock);
-	locked = true;
-	total_pages = 0;
+	assert_spin_locked(&swap_lock);
 	for (type = swap_list.head; type >= 0; type = si->next) {
 		si = swap_info[type];
-		total_pages += atomic_read(&si->frontswap_pages);
+		totalpages += atomic_read(&si->frontswap_pages);
 	}
-	if (total_pages <= target_pages)
-		goto out;
-	total_pages_to_unuse = total_pages - target_pages;
+	return totalpages;
+}
+
+static int __frontswap_unuse_pages(unsigned long total, unsigned long *unused,
+					int *swapid)
+{
+	int ret = -EINVAL;
+	struct swap_info_struct *si = NULL;
+	int si_frontswap_pages;
+	unsigned long total_pages_to_unuse = total;
+	unsigned long pages = 0, pages_to_unuse = 0;
+	int type;
+
+	assert_spin_locked(&swap_lock);
 	for (type = swap_list.head; type >= 0; type = si->next) {
 		si = swap_info[type];
 		si_frontswap_pages = atomic_read(&si->frontswap_pages);
@@ -258,12 +251,48 @@ void frontswap_shrink(unsigned long target_pages)
 			pages_to_unuse = 0; /* unuse all */
 		}
 		/* ensure there is enough RAM to fetch pages from frontswap */
-		if (security_vm_enough_memory_mm(current->mm, pages))
+		if (security_vm_enough_memory_mm(current->mm, pages)) {
+			ret = -ENOMEM;
 			continue;
+		}
 		vm_unacct_memory(pages);
+		*unused = pages_to_unuse;
+		*swapid = type;
+		ret = 0;
 		break;
 	}
-	if (type < 0)
+
+	return ret;
+}
+
+/*
+ * Frontswap, like a true swap device, may unnecessarily retain pages
+ * under certain circumstances; "shrink" frontswap is essentially a
+ * "partial swapoff" and works by calling try_to_unuse to attempt to
+ * unuse enough frontswap pages to attempt to -- subject to memory
+ * constraints -- reduce the number of pages in frontswap to the
+ * number given in the parameter target_pages.
+ */
+void frontswap_shrink(unsigned long target_pages)
+{
+	unsigned long total_pages = 0, total_pages_to_unuse;
+	unsigned long pages_to_unuse = 0;
+	int type, ret;
+	bool locked = false;
+
+	/*
+	 * we don't want to hold swap_lock while doing a very
+	 * lengthy try_to_unuse, but swap_list may change
+	 * so restart scan from swap_list.head each time
+	 */
+	spin_lock(&swap_lock);
+	locked = true;
+	total_pages = __frontswap_curr_pages();
+	if (total_pages <= target_pages)
+		goto out;
+	total_pages_to_unuse = total_pages - target_pages;
+	ret = __frontswap_unuse_pages(total_pages_to_unuse, &pages_to_unuse, &type);
+	if (ret < 0)
 		goto out;
 	locked = false;
 	spin_unlock(&swap_lock);
@@ -282,16 +311,12 @@ EXPORT_SYMBOL(frontswap_shrink);
  */
 unsigned long frontswap_curr_pages(void)
 {
-	int type;
 	unsigned long totalpages = 0;
-	struct swap_info_struct *si = NULL;
 
 	spin_lock(&swap_lock);
-	for (type = swap_list.head; type >= 0; type = si->next) {
-		si = swap_info[type];
-		totalpages += atomic_read(&si->frontswap_pages);
-	}
+	totalpages = __frontswap_curr_pages();
 	spin_unlock(&swap_lock);
+
 	return totalpages;
 }
 EXPORT_SYMBOL(frontswap_curr_pages);
