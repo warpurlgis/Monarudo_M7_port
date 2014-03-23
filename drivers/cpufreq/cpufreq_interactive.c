@@ -16,21 +16,27 @@
  *
  */
 
-#include <linux/cpu.h>
-#include <linux/cpumask.h>
-#include <linux/cpufreq.h>
-#include <linux/module.h>
-#include <linux/mutex.h>
-#include <linux/sched.h>
-#include <linux/tick.h>
+#include <asm/cputime.h>
+#include <linux/kthread.h>
 #include <linux/time.h>
 #include <linux/timer.h>
-#include <linux/workqueue.h>
-#include <linux/kthread.h>
+#include <linux/cpumask.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/init.h>
+#include <linux/cpufreq.h>
+#include <linux/cpu.h>
+#include <linux/jiffies.h>
+#include <linux/kernel_stat.h>
 #include <linux/mutex.h>
-#include <linux/slab.h>
+#include <linux/hrtimer.h>
+#include <linux/tick.h>
+#include <linux/ktime.h>
+#include <linux/sched.h>
 #include <linux/input.h>
-#include <asm/cputime.h>
+#include <linux/workqueue.h>
+#include <linux/slab.h>
+#include <linux/earlysuspend.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/cpufreq_interactive.h>
@@ -845,6 +851,9 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			pcpu->hispeed_validate_time =
 				pcpu->target_set_time;
 			pcpu->governor_enabled = 1;
+			pcpu->idle_exit_time = pcpu->target_set_time;
+			mod_timer(&pcpu->cpu_timer,
+				jiffies + usecs_to_jiffies(timer_rate));
 			smp_wmb();
 		}
 
@@ -969,6 +978,9 @@ static int __init cpufreq_interactive_init(void)
 	spin_lock_init(&down_cpumask_lock);
 	mutex_init(&set_speed_lock);
 
+	/* Kick the kthread to idle */
+	wake_up_process(up_task);
+
 	idle_notifier_register(&cpufreq_interactive_idle_nb);
 	INIT_WORK(&inputopen.inputopen_work, cpufreq_interactive_input_open);
 	return cpufreq_register_governor(&cpufreq_gov_interactive);
@@ -998,3 +1010,4 @@ MODULE_AUTHOR("Mike Chan <mike@android.com>");
 MODULE_DESCRIPTION("'cpufreq_interactive' - A cpufreq governor for "
 	"Latency sensitive workloads");
 MODULE_LICENSE("GPL");
+
