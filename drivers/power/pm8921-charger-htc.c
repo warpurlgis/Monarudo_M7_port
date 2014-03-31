@@ -68,6 +68,10 @@ struct workqueue_struct *ext_charger_wq = NULL;
 static bool flag_enable_BMS_Charger_log;
 #define BATT_LOG_BUF_LEN (1024)
 
+#ifdef CONFIG_FORCE_FAST_CHARGE
+#include <linux/fastchg.h>
+#endif
+
 #define CHG_BUCK_CLOCK_CTRL	0x14
 
 #define PBL_ACCESS1		0x04
@@ -2397,7 +2401,39 @@ static void __pm8921_charger_vbus_draw(unsigned int mA)
 		}
 		if (i < 0)
 			i = 0;
+
+#ifdef CONFIG_FORCE_FAST_CHARGE
+		if (force_fast_charge == 1)
+			i = 4;
+		else if (force_fast_charge == 2) {
+			switch (fast_charge_level) {
+				case FAST_CHARGE_500:
+					i = 1;
+					break;
+				case FAST_CHARGE_700:
+					i = 2;
+					break;
+				case FAST_CHARGE_900:
+					i = 4;
+					break;
+				case FAST_CHARGE_1100:
+					i = 5;
+					break;
+				case FAST_CHARGE_1300:
+					i = 6;
+					break;
+				case FAST_CHARGE_1500:
+					i = 7;
+					break;
+				default:
+					break;
+			}
+		}
 		rc = pm_chg_iusbmax_set(the_chip, i);
+		pr_info("charge curent index => %d\n", i);
+#else
+		rc = pm_chg_iusbmax_set(the_chip, i);
+#endif
 		if (rc)
 			pr_err("unable to set iusb to %d rc = %d\n", i, rc);
 	}
@@ -3544,7 +3580,7 @@ finish_due_to_no_cable:
 
 static int find_usb_ma_value(int value)
 {
-	int i = 0;
+	int i;
 
 	for (i = ARRAY_SIZE(usb_ma_table) - 1; i >= 0; i--) {
 		if (value >= usb_ma_table[i].usb_ma)
@@ -4182,7 +4218,7 @@ static void unplug_check_worker(struct work_struct *work)
 	struct pm8921_chg_chip *chip = container_of(dwork,
 				struct pm8921_chg_chip, unplug_check_work);
 	u8 reg_loop, active_path;
-	int rc, ibat, active_chg_plugged_in, usb_ma = 0;
+	int rc, ibat, active_chg_plugged_in, usb_ma;
 	int chg_gone = 0, is_wlc_remove = 0;
 	unsigned long time_since_last_update_ms, cur_jiffies;
 	static int rb_trial_count = 0;
@@ -6549,7 +6585,7 @@ static const struct dev_pm_ops pm8921_charger_pm_ops = {
 
 static void ext_usb_vbatdet_irq_handler(struct work_struct *w)
 {
-	int result = 0;
+	int result;
 
 	pm8921_get_batt_voltage(&result);
 
@@ -6578,7 +6614,7 @@ static void ext_usb_vbatdet_irq_handler(struct work_struct *w)
 
 static void ext_usb_chgdone_irq_handler(struct work_struct *w)
 {
-	int result =0;
+	int result;
 
 	pm8921_get_batt_voltage(&result);
 
@@ -6983,3 +7019,4 @@ MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("PMIC8921 charger/battery driver");
 MODULE_VERSION("1.0");
 MODULE_ALIAS("platform:" PM8921_CHARGER_DEV_NAME);
+
