@@ -353,12 +353,11 @@ CC		= $(srctree)/scripts/gcc-wrapper.py $(REAL_CC)
 
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
-MODFLAGS	= -DMODULE -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr -ffast-math -fsingle-precision-constant -mtune=cortex-a15 -marm -march=armv7-a -mfpu=neon -mfpu=neon -ftree-vectorize -mvectorize-with-neon-quad -funswitch-loops -funroll-loops
-CFLAGS_MODULE   = $(MODFLAGS)
-AFLAGS_MODULE   = $(MODFLAGS)
+CFLAGS_MODULE   =
+AFLAGS_MODULE   =
 LDFLAGS_MODULE  =
-CFLAGS_KERNEL	= -mtune=cortex-a15 -marm -march=armv7-a -mfpu=neon -ftree-vectorize -funroll-loops -funswitch-loops -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr -ffast-math -fsingle-precision-constant -mvectorize-with-neon-quad
-AFLAGS_KERNEL	= -mtune=cortex-a15 -marm -march=armv7-a -mfpu=neon -ftree-vectorize -funroll-loops -funswitch-loops -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr -ffast-math -fsingle-precision-constant -mvectorize-with-neon-quad
+CFLAGS_KERNEL	=
+AFLAGS_KERNEL	=
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
 
@@ -378,16 +377,12 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
 		   -fno-delete-null-pointer-checks \
-		   -fno-delete-null-pointer-checks \
-           #-floop-interchange -floop-strip-mine \
-           -fgraphite-identity -ftree-loop-distribution \
-           #-pipe -floop-block -ftree-loop-linear \
-           -floop-parallelize-all
+
 KBUILD_AFLAGS_KERNEL :=
-KBUILD_CFLAGS_KERNEL :=
+KBUILD_CFLAGS_KERNEL := -mfpu=neon-vfpv4 -mvectorize-with-neon-quad -fgcse-lm -fgcse-sm -fsched-spec-load -fsingle-precision-constant
 KBUILD_AFLAGS   := -D__ASSEMBLY__
 KBUILD_AFLAGS_MODULE  := -DMODULE
-KBUILD_CFLAGS_MODULE  := -DMODULE
+KBUILD_CFLAGS_MODULE  := -DMODULE -mfpu=neon-vfpv4 -mvectorize-with-neon-quad -fgcse-lm -fgcse-sm -fsched-spec-load -fsingle-precision-constant
 KBUILD_LDFLAGS_MODULE := -T $(srctree)/scripts/module-common.lds
 
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
