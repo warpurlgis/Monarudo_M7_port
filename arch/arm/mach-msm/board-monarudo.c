@@ -4780,6 +4780,7 @@ static void __init monarudo_allocate_memory_regions(void)
  	else
  		pr_err("Failed to reserve space for hardboot page at 0x%X!\n", start);
  #endif
+
 	monarudo_allocate_fb_region();
 }
 
