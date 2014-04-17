@@ -379,10 +379,10 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-delete-null-pointer-checks \
 
 KBUILD_AFLAGS_KERNEL :=
-KBUILD_CFLAGS_KERNEL := -mfpu=neon-vfpv4 -mvectorize-with-neon-quad -fgcse-lm -fgcse-sm -fsched-spec-load -fsingle-precision-constant
+KBUILD_CFLAGS_KERNEL := -mfpu=neon-vfpv4 -fgcse-lm -fgcse-sm -fsched-spec-load -fsingle-precision-constant
 KBUILD_AFLAGS   := -D__ASSEMBLY__
 KBUILD_AFLAGS_MODULE  := -DMODULE
-KBUILD_CFLAGS_MODULE  := -DMODULE -mfpu=neon-vfpv4 -mvectorize-with-neon-quad -fgcse-lm -fgcse-sm -fsched-spec-load -fsingle-precision-constant
+KBUILD_CFLAGS_MODULE  := -DMODULE -mfpu=neon-vfpv4 -fgcse-lm -fgcse-sm -fsched-spec-load -fsingle-precision-constant
 KBUILD_LDFLAGS_MODULE := -T $(srctree)/scripts/module-common.lds
 
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
